@@ -3,10 +3,17 @@ import 'package:provider/provider.dart';
 import 'package:pray_times/services/theme_provider.dart';
 import 'package:pray_times/screens/home_screen.dart';
 import 'package:pray_times/screens/settings_screen.dart';
-import 'package:pray_times/screens/qiblah_screen.dart';
+import 'package:flutter/services.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Lock orientation to portrait mode for better user experience
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+  
   runApp(
     ChangeNotifierProvider(
       create: (context) => ThemeProvider(),
@@ -55,7 +62,6 @@ class _MainScreenState extends State<MainScreen> {
   
   static const List<Widget> _screens = <Widget>[
     HomeScreen(),
-    QiblahScreen(),
     SettingsScreen(),
   ];
 
@@ -74,10 +80,6 @@ class _MainScreenState extends State<MainScreen> {
           NavigationDestination(
             icon: Icon(Icons.access_time),
             label: 'Prayer Times',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.explore),
-            label: 'Qiblah',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings),

@@ -18,19 +18,27 @@ class PrayerTimesService {
   }
 
   String getNextPrayer(PrayerTimes prayerTimes) {
-    return prayerTimes.nextPrayer().name;
+    try {
+      return prayerTimes.nextPrayer().name;
+    } catch (e) {
+      return "Unknown";
+    }
   }
 
   String getTimeUntilNextPrayer(PrayerTimes prayerTimes) {
-    final nextPrayerTime = prayerTimes.timeForPrayer(prayerTimes.nextPrayer());
-    if (nextPrayerTime == null) return 'N/A';
-    
-    final now = DateTime.now();
-    final difference = nextPrayerTime.difference(now);
-    
-    final hours = difference.inHours;
-    final minutes = difference.inMinutes % 60;
-    
-    return '$hours hr ${minutes.abs()} min';
+    try {
+      final nextPrayerTime = prayerTimes.timeForPrayer(prayerTimes.nextPrayer());
+      if (nextPrayerTime == null) return 'N/A';
+      
+      final now = DateTime.now();
+      final difference = nextPrayerTime.difference(now);
+      
+      final hours = difference.inHours;
+      final minutes = difference.inMinutes % 60;
+      
+      return '$hours hr ${minutes.abs()} min';
+    } catch (e) {
+      return 'N/A';
+    }
   }
 }

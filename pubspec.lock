@@ -94,14 +94,6 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  flutter_compass:
-    dependency: transitive
-    description:
-      name: flutter_compass
-      sha256: "1b4d7e6c95a675ec8482b5c9c9ccf1ebf0ced3dbec59dce28ad609da953de850"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.8.1"
   flutter_lints:
     dependency: "direct dev"
     description:
@@ -110,14 +102,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.0.0"
-  flutter_qiblah:
-    dependency: "direct main"
-    description:
-      name: flutter_qiblah
-      sha256: cdcf87353c2d2d6d0cfdf937d39f628794e2360a683bc41355c5121ea2e84513
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.2.1"
   flutter_test:
     dependency: "direct dev"
     description: flutter
@@ -413,14 +397,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.4"
-  stream_transform:
-    dependency: transitive
-    description:
-      name: stream_transform
-      sha256: ad47125e588cfd37a9a7f86c7d6356dde8dfe89d071d293f80ca9e9273a33871
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.1.1"
   string_scanner:
     dependency: transitive
     description:

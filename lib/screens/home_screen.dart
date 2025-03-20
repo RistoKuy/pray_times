@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:adhan/adhan.dart';
 import 'package:intl/intl.dart';
 import 'package:pray_times/services/location_service.dart';
@@ -206,7 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'dhuhr':
         return Icons.wb_sunny;
       case 'asr':
-        return Icons.wb_twighlight;
+        return Icons.wb_twilight; // Fixed typo: was wb_twighlight
       case 'maghrib':
         return Icons.brightness_4;
       case 'isha':
