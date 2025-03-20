@@ -32,10 +32,10 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      final position = await _locationService.getCurrentPosition();
+      final position = await _locationService.getCurrentPosition(context: context);
       if (position == null) {
         setState(() {
-          _errorMessage = "Location permission denied";
+          _errorMessage = "Location permission denied or location service is disabled. Please enable location for accurate prayer times.";
           _isLoading = false;
         });
         return;
