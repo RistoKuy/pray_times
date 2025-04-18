@@ -1,9 +1,48 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:pray_times/services/theme_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  bool _use24HourFormat = false;
+  int _calculationMethod = 2; // Default to ISNA method
+  
+  @override
+  void initState() {
+    super.initState();
+    _loadPreferences();
+  }
+  
+  Future<void> _loadPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _use24HourFormat = prefs.getBool('use24HourFormat') ?? false;
+      _calculationMethod = prefs.getInt('calculationMethod') ?? 2;
+    });
+  }
+  
+  Future<void> _saveTimeFormatPreference(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('use24HourFormat', value);
+    setState(() {
+      _use24HourFormat = value;
+    });
+  }
+  
+  Future<void> _saveCalculationMethod(int value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('calculationMethod', value);
+    setState(() {
+      _calculationMethod = value;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,6 +64,35 @@ class SettingsScreen extends StatelessWidget {
           ),
           _buildThemeSelector(context),
           const Divider(),
+          
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(
+              'Time Format',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          SwitchListTile(
+            title: const Text('Use 24-Hour Format'),
+            subtitle: Text(_use24HourFormat ? 'Current: 24-hour (e.g., 14:30)' : 'Current: 12-hour (e.g., 2:30 PM)'),
+            value: _use24HourFormat,
+            onChanged: _saveTimeFormatPreference,
+          ),
+          const Divider(),
+          
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(
+              'About',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
           ListTile(
             leading: const Icon(Icons.info_outline),
             title: const Text('About'),

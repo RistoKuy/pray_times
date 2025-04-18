@@ -8,7 +8,8 @@ plugins {
 android {
     namespace = "com.example.pray_times"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // Override the Flutter ndkVersion with the higher version required by plugins
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

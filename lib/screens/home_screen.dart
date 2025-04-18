@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:pray_times/models/prayer_time.dart';
 import 'package:pray_times/services/prayer_times_service.dart';
+import 'package:pray_times/services/location_service.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -11,26 +14,70 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final PrayerTimesService _prayerTimesService = PrayerTimesService();
+  final LocationService _locationService = LocationService();
   DailyPrayerTimes? _prayerTimes;
   bool _isLoading = true;
   String _error = '';
-  String _selectedCityId = '1301'; // Default to Jakarta
+  Position? _currentPosition;
+  int? _calculationMethod;
+  bool _use24HourFormat = false;
   
   @override
   void initState() {
     super.initState();
-    _fetchPrayerTimes();
+    _loadPreferences();
   }
   
-  Future<void> _fetchPrayerTimes() async {
+  Future<void> _loadPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _calculationMethod = prefs.getInt('calculationMethod');
+      _use24HourFormat = prefs.getBool('use24HourFormat') ?? false;
+    });
+    _getCurrentLocationAndFetchPrayerTimes();
+  }
+  
+  Future<void> _getCurrentLocationAndFetchPrayerTimes() async {
     setState(() {
       _isLoading = true;
       _error = '';
     });
     
     try {
+      // Get current position
+      _currentPosition = await _locationService.getCurrentPosition(context: context);
+      if (_currentPosition == null) {
+        setState(() {
+          _error = 'Unable to get current location. Please check your location settings.';
+          _isLoading = false;
+        });
+        return;
+      }
+      
+      // Get prayer times based on location
+      await _fetchPrayerTimes();
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+  
+  Future<void> _fetchPrayerTimes() async {
+    if (_currentPosition == null) {
+      setState(() {
+        _error = 'Location not available. Please enable location services.';
+        _isLoading = false;
+      });
+      return;
+    }
+    
+    try {
       final prayerTimes = await _prayerTimesService.getPrayerTimes(
-        cityId: _selectedCityId,
+        latitude: _currentPosition!.latitude,
+        longitude: _currentPosition!.longitude,
+        method: _calculationMethod,
       );
       setState(() {
         _prayerTimes = prayerTimes;
@@ -52,7 +99,14 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _fetchPrayerTimes,
+            onPressed: _getCurrentLocationAndFetchPrayerTimes,
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () async {
+              await Navigator.pushNamed(context, '/settings');
+              _loadPreferences();
+            },
           ),
         ],
       ),
@@ -72,12 +126,12 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Text(
               'Error: $_error',
-              style: TextStyle(color: Colors.red),
+              style: const TextStyle(color: Colors.red),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: _fetchPrayerTimes,
+              onPressed: _getCurrentLocationAndFetchPrayerTimes,
               child: const Text('Try Again'),
             ),
           ],
@@ -93,9 +147,22 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Text(
-            _prayerTimes!.date,
-            style: Theme.of(context).textTheme.headlineSmall,
+          child: Column(
+            children: [
+              Text(
+                _prayerTimes!.date,
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              if (_currentPosition != null)
+                Text(
+                  'Location: ${_currentPosition!.latitude.toStringAsFixed(4)}, ${_currentPosition!.longitude.toStringAsFixed(4)}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              Text(
+                'Time Format: ${_use24HourFormat ? '24-hour' : '12-hour'}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
           ),
         ),
         Expanded(
