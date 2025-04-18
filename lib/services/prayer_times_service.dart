@@ -3,49 +3,34 @@ import 'package:http/http.dart' as http;
 import 'package:pray_times/models/prayer_time.dart';
 
 class PrayerTimesService {
-  static const String baseUrl = 'https://jadwalsholat.org/api';
-  
-  // Fetch prayer times for a specific city
+  // Base URL for the prayer times API
+  final String baseUrl = 'https://api.pray.times.example';
+
+  // Fetch prayer times for a specific city ID
   Future<DailyPrayerTimes> getPrayerTimes({required String cityId}) async {
     try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/prayer_times.php?id=$cityId'),
-      );
+      // This is a mock implementation. In production, you would use a real API endpoint
+      // Example: final response = await http.get(Uri.parse('$baseUrl/prayer_times?city_id=$cityId'));
       
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['status'] == 'success' && data['results'] != null) {
-          return DailyPrayerTimes.fromJson(data['results']);
-        } else {
-          throw Exception('Failed to load prayer times: ${data['status']}');
-        }
-      } else {
-        throw Exception('Failed to load prayer times: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error fetching prayer times: $e');
-    }
-  }
-  
-  // Get list of available cities
-  Future<List<Map<String, dynamic>>> getCities() async {
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/city_list.php'),
-      );
+      // For demonstration purposes, returning mock data
+      await Future.delayed(Duration(seconds: 1)); // Simulate network delay
       
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['status'] == 'success' && data['results'] != null) {
-          return List<Map<String, dynamic>>.from(data['results']);
-        } else {
-          throw Exception('Failed to load cities: ${data['status']}');
-        }
-      } else {
-        throw Exception('Failed to load cities: ${response.statusCode}');
-      }
+      // Mock response data
+      final mockData = {
+        'date': '${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
+        'prayer_times': [
+          {'name': 'Fajr', 'time': '04:30'},
+          {'name': 'Sunrise', 'time': '05:45'},
+          {'name': 'Dhuhr', 'time': '12:00'},
+          {'name': 'Asr', 'time': '15:15'},
+          {'name': 'Maghrib', 'time': '18:10'},
+          {'name': 'Isha', 'time': '19:20'},
+        ]
+      };
+      
+      return DailyPrayerTimes.fromJson(mockData);
     } catch (e) {
-      throw Exception('Error fetching cities: $e');
+      throw Exception('Failed to load prayer times: $e');
     }
   }
 }
