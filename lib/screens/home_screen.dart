@@ -1,8 +1,13 @@
+// ignore_for_file: unused_field
+
 import 'package:flutter/material.dart';
-import 'package:adhan/adhan.dart';
-import 'package:intl/intl.dart';
+import 'package:pray_times/models/prayer_time.dart';
+import 'package:pray_times/services/prayer_times_service.dart';
 import 'package:pray_times/services/location_service.dart';
-import 'package:pray_times/services/prayer_service.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:intl/intl.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -12,206 +17,236 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final PrayerTimesService _prayerTimesService = PrayerTimesService();
   final LocationService _locationService = LocationService();
-  final PrayerTimesService _prayerService = PrayerTimesService();
-  PrayerTimes? _prayerTimes;
+  DailyPrayerTimes? _prayerTimes;
   bool _isLoading = true;
-  String _locationInfo = "Unknown location";
-  String _errorMessage = "";
-
+  String _error = '';
+  Position? _currentPosition;
+  String _locationName = "Unknown location";
+  int? _calculationMethod;
+  bool _use24HourFormat = false;
+  int _timeCalibration = 0; // Time adjustment in minutes
+  
   @override
   void initState() {
     super.initState();
-    _loadPrayerTimes();
+    _loadPreferences();
   }
-
-  Future<void> _loadPrayerTimes() async {
+  
+  Future<void> _loadPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _calculationMethod = prefs.getInt('calculationMethod');
+      _use24HourFormat = prefs.getBool('use24HourFormat') ?? false;
+      _timeCalibration = prefs.getInt('timeCalibration') ?? 0;
+    });
+    _getCurrentLocationAndFetchPrayerTimes();
+  }
+  
+  Future<void> _getCurrentLocationAndFetchPrayerTimes() async {
     setState(() {
       _isLoading = true;
-      _errorMessage = "";
+      _error = '';
     });
-
+    
     try {
-      final position = await _locationService.getCurrentPosition(context: context);
-      if (position == null) {
+      // Get current position
+      _currentPosition = await _locationService.getCurrentPosition(context: context);
+      if (_currentPosition == null) {
         setState(() {
-          _errorMessage = "Location permission denied or location service is disabled. Please enable location for accurate prayer times.";
+          _error = 'Unable to get current location. Please check your location settings.';
           _isLoading = false;
         });
         return;
       }
-
-      final prayerTimes = await _prayerService.getPrayerTimes(position);
       
+      // Get readable location name
+      await _getLocationName();
+      
+      // Get prayer times based on location
+      await _fetchPrayerTimes();
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+  
+  Future<void> _getLocationName() async {
+    if (_currentPosition == null) return;
+    
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        _currentPosition!.latitude,
+        _currentPosition!.longitude
+      );
+      
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks.first;
+        String locality = place.locality ?? '';
+        String administrativeArea = place.administrativeArea ?? '';
+        String country = place.country ?? '';
+        
+        setState(() {
+          if (locality.isNotEmpty) {
+            _locationName = "$locality, $country";
+          } else if (administrativeArea.isNotEmpty) {
+            _locationName = "$administrativeArea, $country";
+          } else {
+            _locationName = country;
+          }
+        });
+      }
+    } catch (e) {
+      // If geocoding fails, use coordinates as fallback but in a user-friendly format
+      setState(() {
+        _locationName = "Current location";
+      });
+    }
+  }
+  
+  Future<void> _fetchPrayerTimes() async {
+    if (_currentPosition == null) {
+      setState(() {
+        _error = 'Location not available. Please enable location services.';
+        _isLoading = false;
+      });
+      return;
+    }
+    
+    try {
+      final prayerTimes = await _prayerTimesService.getPrayerTimes(
+        latitude: _currentPosition!.latitude,
+        longitude: _currentPosition!.longitude,
+        method: _calculationMethod,
+        calibration: _timeCalibration,
+      );
       setState(() {
         _prayerTimes = prayerTimes;
-        _locationInfo = "Lat: ${position.latitude.toStringAsFixed(4)}, Lng: ${position.longitude.toStringAsFixed(4)}";
         _isLoading = false;
       });
     } catch (e) {
       setState(() {
-        _errorMessage = "Error loading prayer times: $e";
+        _error = e.toString();
         _isLoading = false;
       });
     }
   }
 
+  String _formatDate(String dateStr) {
+    try {
+      // Parse the date (assuming format is DD/MM/YYYY)
+      List<String> parts = dateStr.split('/');
+      if (parts.length != 3) return dateStr;
+      
+      int day = int.parse(parts[0]);
+      int month = int.parse(parts[1]);
+      int year = int.parse(parts[2]);
+      
+      DateTime date = DateTime(year, month, day);
+      return DateFormat('d MMMM yyyy').format(date);
+    } catch (e) {
+      return dateStr; // Return original if parsing fails
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDarkMode = theme.brightness == Brightness.dark;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Prayer Times'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _loadPrayerTimes,
+            onPressed: _getCurrentLocationAndFetchPrayerTimes,
           ),
         ],
       ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator())
-        : _errorMessage.isNotEmpty
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      _errorMessage,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.red),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: _loadPrayerTimes,
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          : _buildPrayerTimesContent(isDarkMode),
+      body: _buildBody(),
     );
   }
 
-  Widget _buildPrayerTimesContent(bool isDarkMode) {
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    
+    if (_error.isNotEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'Error: $_error',
+              style: const TextStyle(color: Colors.red),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _getCurrentLocationAndFetchPrayerTimes,
+              child: const Text('Try Again'),
+            ),
+          ],
+        ),
+      );
+    }
+    
     if (_prayerTimes == null) {
       return const Center(child: Text('No prayer times available'));
     }
-
-    final nextPrayer = _prayerService.getNextPrayer(_prayerTimes!);
-    final timeUntilNext = _prayerService.getTimeUntilNextPrayer(_prayerTimes!);
     
-    return RefreshIndicator(
-      onRefresh: _loadPrayerTimes,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: Padding(
+    return Column(
+      children: [
+        Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Card(
-                elevation: 4,
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      Text(
-                        DateFormat.yMMMMd().format(DateTime.now()),
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _locationInfo,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      const Divider(),
-                      Text(
-                        'Next Prayer: $nextPrayer in $timeUntilNext',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: isDarkMode ? Colors.lightBlueAccent : Colors.blueAccent,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              Text(
+                _formatDate(_prayerTimes!.date),
+                style: Theme.of(context).textTheme.headlineSmall,
               ),
-              const SizedBox(height: 16),
-              _buildPrayerTimeCard('Fajr', _prayerService.formatPrayerTime(_prayerTimes!.fajr), isDarkMode),
-              _buildPrayerTimeCard('Sunrise', _prayerService.formatPrayerTime(_prayerTimes!.sunrise), isDarkMode),
-              _buildPrayerTimeCard('Dhuhr', _prayerService.formatPrayerTime(_prayerTimes!.dhuhr), isDarkMode),
-              _buildPrayerTimeCard('Asr', _prayerService.formatPrayerTime(_prayerTimes!.asr), isDarkMode),
-              _buildPrayerTimeCard('Maghrib', _prayerService.formatPrayerTime(_prayerTimes!.maghrib), isDarkMode),
-              _buildPrayerTimeCard('Isha', _prayerService.formatPrayerTime(_prayerTimes!.isha), isDarkMode),
+              const SizedBox(height: 8),
+              Text(
+                'Location: $_locationName',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              if (_timeCalibration != 0)
+                Text(
+                  'Time adjusted: ${_timeCalibration > 0 ? "+$_timeCalibration" : _timeCalibration} minutes',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildPrayerTimeCard(String name, String time, bool isDarkMode) {
-    final isNextPrayer = _prayerTimes != null && 
-        _prayerService.getNextPrayer(_prayerTimes!).toLowerCase() == name.toLowerCase();
-    
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.only(bottom: 12),
-      color: isNextPrayer 
-        ? (isDarkMode ? Colors.blue.shade900 : Colors.blue.shade50)
-        : null,
-      child: ListTile(
-        leading: Icon(
-          _getIconForPrayer(name),
-          color: isNextPrayer 
-            ? (isDarkMode ? Colors.white : Colors.blue.shade700)
-            : null,
-        ),
-        title: Text(
-          name,
-          style: TextStyle(
-            fontWeight: isNextPrayer ? FontWeight.bold : FontWeight.normal,
-            color: isNextPrayer 
-              ? (isDarkMode ? Colors.white : Colors.blue.shade700)
-              : null,
+        Expanded(
+          child: ListView.builder(
+            itemCount: _prayerTimes!.prayerTimes.length,
+            itemBuilder: (context, index) {
+              final prayer = _prayerTimes!.prayerTimes[index];
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: ListTile(
+                  leading: Icon(
+                    Icons.access_time,
+                    // Use current theme's icon color instead of hardcoded color
+                    color: Theme.of(context).iconTheme.color,
+                  ),
+                  title: Text(
+                    prayer.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  trailing: Text(
+                    prayer.time,
+                    style: const TextStyle(fontSize: 18),
+                  ),
+                ),
+              );
+            },
           ),
         ),
-        trailing: Text(
-          time,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: isNextPrayer ? FontWeight.bold : FontWeight.normal,
-            color: isNextPrayer 
-              ? (isDarkMode ? Colors.white : Colors.blue.shade800)
-              : null,
-          ),
-        ),
-      ),
+      ],
     );
-  }
-
-  IconData _getIconForPrayer(String prayer) {
-    switch (prayer.toLowerCase()) {
-      case 'fajr':
-        return Icons.brightness_3;
-      case 'sunrise':
-        return Icons.wb_sunny_outlined;
-      case 'dhuhr':
-        return Icons.wb_sunny;
-      case 'asr':
-        return Icons.wb_twilight; // Fixed typo: was wb_twighlight
-      case 'maghrib':
-        return Icons.brightness_4;
-      case 'isha':
-        return Icons.nightlight_round;
-      default:
-        return Icons.access_time;
-    }
   }
 }
