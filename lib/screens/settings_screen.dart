@@ -1,3 +1,5 @@
+// ignore_for_file: unused_field, unused_element
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:pray_times/services/theme_provider.dart';
@@ -13,6 +15,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _use24HourFormat = false;
   int _calculationMethod = 2; // Default to ISNA method
+  int _timeCalibration = 0; // Time adjustment in minutes
   
   @override
   void initState() {
@@ -25,6 +28,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _use24HourFormat = prefs.getBool('use24HourFormat') ?? false;
       _calculationMethod = prefs.getInt('calculationMethod') ?? 2;
+      _timeCalibration = prefs.getInt('timeCalibration') ?? 0;
     });
   }
   
@@ -41,6 +45,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await prefs.setInt('calculationMethod', value);
     setState(() {
       _calculationMethod = value;
+    });
+  }
+  
+  Future<void> _saveTimeCalibration(int value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('timeCalibration', value);
+    setState(() {
+      _timeCalibration = value;
     });
   }
 
@@ -68,7 +80,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const Padding(
             padding: EdgeInsets.all(16.0),
             child: Text(
-              'Time Format',
+              'Time Settings',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -80,6 +92,70 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: Text(_use24HourFormat ? 'Current: 24-hour (e.g., 14:30)' : 'Current: 12-hour (e.g., 2:30 PM)'),
             value: _use24HourFormat,
             onChanged: _saveTimeFormatPreference,
+          ),
+          const Divider(),
+          
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(
+              'Prayer Time Calibration',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Adjust prayer times by ${_timeCalibration > 0 ? "+" : ""}$_timeCalibration minutes',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Use this to correct prayer times if they are earlier or later than your local schedule.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ElevatedButton(
+                      onPressed: () {
+                        _saveTimeCalibration(_timeCalibration - 1);
+                      },
+                      child: const Icon(Icons.remove),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Text(
+                        '${_timeCalibration > 0 ? "+" : ""}$_timeCalibration min',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        _saveTimeCalibration(_timeCalibration + 1);
+                      },
+                      child: const Icon(Icons.add),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () {
+                    _saveTimeCalibration(0);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 40),
+                  ),
+                  child: const Text('Reset to Default'),
+                ),
+              ],
+            ),
           ),
           const Divider(),
           

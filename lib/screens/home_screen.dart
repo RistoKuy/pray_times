@@ -1,9 +1,13 @@
+// ignore_for_file: unused_field
+
 import 'package:flutter/material.dart';
 import 'package:pray_times/models/prayer_time.dart';
 import 'package:pray_times/services/prayer_times_service.dart';
 import 'package:pray_times/services/location_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:intl/intl.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,8 +23,10 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   String _error = '';
   Position? _currentPosition;
+  String _locationName = "Unknown location";
   int? _calculationMethod;
   bool _use24HourFormat = false;
+  int _timeCalibration = 0; // Time adjustment in minutes
   
   @override
   void initState() {
@@ -33,6 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _calculationMethod = prefs.getInt('calculationMethod');
       _use24HourFormat = prefs.getBool('use24HourFormat') ?? false;
+      _timeCalibration = prefs.getInt('timeCalibration') ?? 0;
     });
     _getCurrentLocationAndFetchPrayerTimes();
   }
@@ -54,12 +61,48 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
       
+      // Get readable location name
+      await _getLocationName();
+      
       // Get prayer times based on location
       await _fetchPrayerTimes();
     } catch (e) {
       setState(() {
         _error = e.toString();
         _isLoading = false;
+      });
+    }
+  }
+  
+  Future<void> _getLocationName() async {
+    if (_currentPosition == null) return;
+    
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        _currentPosition!.latitude,
+        _currentPosition!.longitude
+      );
+      
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks.first;
+        String locality = place.locality ?? '';
+        String administrativeArea = place.administrativeArea ?? '';
+        String country = place.country ?? '';
+        
+        setState(() {
+          if (locality.isNotEmpty) {
+            _locationName = "$locality, $country";
+          } else if (administrativeArea.isNotEmpty) {
+            _locationName = "$administrativeArea, $country";
+          } else {
+            _locationName = country;
+          }
+        });
+      }
+    } catch (e) {
+      // If geocoding fails, use coordinates as fallback but in a user-friendly format
+      setState(() {
+        _locationName = "Current location";
       });
     }
   }
@@ -78,6 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
         latitude: _currentPosition!.latitude,
         longitude: _currentPosition!.longitude,
         method: _calculationMethod,
+        calibration: _timeCalibration,
       );
       setState(() {
         _prayerTimes = prayerTimes;
@@ -91,6 +135,23 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  String _formatDate(String dateStr) {
+    try {
+      // Parse the date (assuming format is DD/MM/YYYY)
+      List<String> parts = dateStr.split('/');
+      if (parts.length != 3) return dateStr;
+      
+      int day = int.parse(parts[0]);
+      int month = int.parse(parts[1]);
+      int year = int.parse(parts[2]);
+      
+      DateTime date = DateTime(year, month, day);
+      return DateFormat('d MMMM yyyy').format(date);
+    } catch (e) {
+      return dateStr; // Return original if parsing fails
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -100,13 +161,6 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _getCurrentLocationAndFetchPrayerTimes,
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () async {
-              await Navigator.pushNamed(context, '/settings');
-              _loadPreferences();
-            },
           ),
         ],
       ),
@@ -150,18 +204,19 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             children: [
               Text(
-                _prayerTimes!.date,
+                _formatDate(_prayerTimes!.date),
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
-              if (_currentPosition != null)
+              const SizedBox(height: 8),
+              Text(
+                'Location: $_locationName',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              if (_timeCalibration != 0)
                 Text(
-                  'Location: ${_currentPosition!.latitude.toStringAsFixed(4)}, ${_currentPosition!.longitude.toStringAsFixed(4)}',
+                  'Time adjusted: ${_timeCalibration > 0 ? "+$_timeCalibration" : _timeCalibration} minutes',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
-              Text(
-                'Time Format: ${_use24HourFormat ? '24-hour' : '12-hour'}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
             ],
           ),
         ),
@@ -175,7 +230,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: ListTile(
                   leading: Icon(
                     Icons.access_time,
-                    color: Theme.of(context).primaryColor,
+                    // Use current theme's icon color instead of hardcoded color
+                    color: Theme.of(context).iconTheme.color,
                   ),
                   title: Text(
                     prayer.name,

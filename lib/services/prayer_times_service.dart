@@ -12,6 +12,7 @@ class PrayerTimesService {
     required double latitude,
     required double longitude,
     int? method,
+    int calibration = 0,
   }) async {
     try {
       // Get time format preference
@@ -44,13 +45,13 @@ class PrayerTimesService {
           
           final prayerTimesList = <PrayerTime>[];
           
-          // Add each prayer time to the list
-          prayerTimesList.add(PrayerTime(name: 'Fajr', time: _formatTime(timings['Fajr'], use24HourFormat)));
-          prayerTimesList.add(PrayerTime(name: 'Sunrise', time: _formatTime(timings['Sunrise'], use24HourFormat)));
-          prayerTimesList.add(PrayerTime(name: 'Dhuhr', time: _formatTime(timings['Dhuhr'], use24HourFormat)));
-          prayerTimesList.add(PrayerTime(name: 'Asr', time: _formatTime(timings['Asr'], use24HourFormat)));
-          prayerTimesList.add(PrayerTime(name: 'Maghrib', time: _formatTime(timings['Maghrib'], use24HourFormat)));
-          prayerTimesList.add(PrayerTime(name: 'Isha', time: _formatTime(timings['Isha'], use24HourFormat)));
+          // Add each prayer time to the list, applying calibration
+          prayerTimesList.add(PrayerTime(name: 'Fajr', time: _formatTime(timings['Fajr'], use24HourFormat, calibration)));
+          prayerTimesList.add(PrayerTime(name: 'Sunrise', time: _formatTime(timings['Sunrise'], use24HourFormat, calibration)));
+          prayerTimesList.add(PrayerTime(name: 'Dhuhr', time: _formatTime(timings['Dhuhr'], use24HourFormat, calibration)));
+          prayerTimesList.add(PrayerTime(name: 'Asr', time: _formatTime(timings['Asr'], use24HourFormat, calibration)));
+          prayerTimesList.add(PrayerTime(name: 'Maghrib', time: _formatTime(timings['Maghrib'], use24HourFormat, calibration)));
+          prayerTimesList.add(PrayerTime(name: 'Isha', time: _formatTime(timings['Isha'], use24HourFormat, calibration)));
           
           return DailyPrayerTimes(
             date: date,
@@ -67,8 +68,8 @@ class PrayerTimesService {
     }
   }
   
-  // Helper method to format time (removes the timezone part if present and formats according to preference)
-  String _formatTime(String timeString, bool use24HourFormat) {
+  // Helper method to format time with calibration
+  String _formatTime(String timeString, bool use24HourFormat, int calibration) {
     // Remove timezone info if present (e.g., "04:30 (GMT+1)")
     String cleanTime = timeString;
     if (cleanTime.contains('(')) {
@@ -80,12 +81,15 @@ class PrayerTimesService {
       final DateFormat inputFormat = DateFormat('HH:mm');
       final DateTime timeDateTime = inputFormat.parse(cleanTime);
       
+      // Apply calibration (adjust minutes)
+      final DateTime calibratedTime = timeDateTime.add(Duration(minutes: calibration));
+      
       // Format according to preference
       final DateFormat outputFormat = use24HourFormat 
           ? DateFormat('HH:mm')
           : DateFormat('h:mm a');
           
-      return outputFormat.format(timeDateTime);
+      return outputFormat.format(calibratedTime);
     } catch (e) {
       // Return the original time if parsing fails
       return cleanTime;
